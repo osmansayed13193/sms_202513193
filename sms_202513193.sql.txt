@@ -1,0 +1,257 @@
+-- =========================================================================
+-- Soldier Management SQL Quiz
+-- Student Name: Osman Nuseri
+-- Student Number: 202513193
+-- Tool: MySQL 8
+-- =========================================================================
+
+-- Required starting command
+SELECT DATABASE(), CURRENT_USER(), NOW();
+
+
+-- =========================================================================
+-- Part A: Create the tables
+-- =========================================================================
+
+-- Create database if not exists and use it
+CREATE DATABASE IF NOT EXISTS sms_202513193;
+USE sms_202513193;
+
+-- Drop tables in reverse order of dependencies if re-running script
+DROP TABLE IF EXISTS soldier_missions;
+DROP TABLE IF EXISTS soldiers;
+DROP TABLE IF EXISTS missions;
+DROP TABLE IF EXISTS units;
+DROP TABLE IF EXISTS ranks;
+
+-- 1. Ranks Table
+-- Comment: Creates the ranks table to store distinct military ranks and their levels (1 to 6).
+CREATE TABLE ranks (
+    rank_id INT AUTO_INCREMENT PRIMARY KEY,
+    rank_name VARCHAR(50) NOT NULL UNIQUE,
+    rank_level INT NOT NULL CHECK (rank_level BETWEEN 1 AND 6)
+);
+
+-- 2. Units Table
+-- Comment: Creates the units table to store military company names and their physical base locations.
+CREATE TABLE units (
+    unit_id INT AUTO_INCREMENT PRIMARY KEY,
+    unit_name VARCHAR(100) NOT NULL UNIQUE,
+    location VARCHAR(100) NOT NULL
+);
+
+-- 3. Missions Table
+-- Comment: Creates the missions table to track operations, timelines, and ensure valid end dates.
+CREATE TABLE missions (
+    mission_id INT AUTO_INCREMENT PRIMARY KEY,
+    mission_name VARCHAR(100) NOT NULL UNIQUE,
+    start_date DATE NOT NULL,
+    end_date DATE NULL,
+    CONSTRAINT chk_mission_dates CHECK (end_date IS NULL OR end_date >= start_date)
+);
+
+-- 4. Soldiers Table
+-- Comment: Creates the soldiers table holding personnel records, foreign keys to ranks and units, and status validation.
+CREATE TABLE soldiers (
+    soldier_id INT AUTO_INCREMENT PRIMARY KEY,
+    service_number VARCHAR(50) NOT NULL UNIQUE,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    date_of_birth DATE NOT NULL,
+    enlistment_date DATE NOT NULL,
+    status ENUM('Active', 'On Leave', 'Retired') NOT NULL DEFAULT 'Active',
+    rank_id INT NOT NULL,
+    unit_id INT NOT NULL,
+    CONSTRAINT fk_soldier_rank FOREIGN KEY (rank_id) REFERENCES ranks(rank_id),
+    CONSTRAINT fk_soldier_unit FOREIGN KEY (unit_id) REFERENCES units(unit_id),
+    CONSTRAINT chk_enlistment_age CHECK (enlistment_date > date_of_birth)
+);
+
+-- 5. Soldier_Missions Table (Junction Table)
+-- Comment: Creates the junction table to assign soldiers to specific missions with a required role and prevent duplicates.
+CREATE TABLE soldier_missions (
+    soldier_id INT NOT NULL,
+    mission_id INT NOT NULL,
+    mission_role VARCHAR(100) NOT NULL,
+    PRIMARY KEY (soldier_id, mission_id),
+    CONSTRAINT fk_sm_soldier FOREIGN KEY (soldier_id) REFERENCES soldiers(soldier_id),
+    CONSTRAINT fk_sm_mission FOREIGN KEY (mission_id) REFERENCES missions(mission_id)
+);
+
+
+-- =========================================================================
+-- Part B: Insert the data
+-- =========================================================================
+
+-- B1. Insert base lookup data for ranks, units, and missions
+-- Comment: Populates initial rank definitions with hierarchy levels 1 through 6.
+INSERT INTO ranks (rank_id, rank_name, rank_level) VALUES
+(1, 'Private', 1),
+(2, 'Corporal', 2),
+(3, 'Sergeant', 3),
+(4, 'Lieutenant', 4),
+(5, 'Captain', 5),
+(6, 'Major', 6);
+
+-- Comment: Populates units with company names and camp locations.
+INSERT INTO units (unit_id, unit_name, location) VALUES
+(1, 'Alpha Company', 'North Camp'),
+(2, 'Bravo Company', 'South Camp'),
+(3, 'Charlie Company', 'East Camp'),
+(4, 'Delta Company', 'West Camp'),
+(5, 'Signals Unit', 'Central Camp'),
+(6, 'Medical Unit', 'Central Camp');
+
+-- Comment: Populates missions with start and optional end dates.
+INSERT INTO missions (mission_id, mission_name, start_date, end_date) VALUES
+(1, 'Exercise Falcon', '2025-02-03', '2025-02-28'),
+(2, 'Flood Relief', '2025-04-14', '2025-05-30'),
+(3, 'Border Patrol', '2025-07-01', NULL),
+(4, 'Peace Support', '2025-09-15', NULL),
+(5, 'Field Medical Camp', '2026-01-12', '2026-01-23');
+
+-- B2. Run seed script provided by teacher
+-- Comment: Executes external seed script to populate 30 soldiers and their mission assignments.
+-- SOURCE soldiers_seed.sql;
+
+
+-- B3. Insert custom soldiers (IDs 31, 32, 33)
+-- Comment: Inserts student profile (ID 31), custom soldier (ID 32), and unassigned soldier (ID 33) using student number 202513193.
+INSERT INTO soldiers (soldier_id, service_number, first_name, last_name, date_of_birth, enlistment_date, status, rank_id, unit_id) VALUES
+(31, 'ST-202513193', 'Osman', 'Nuseri', '2004-05-12', '2023-01-15', 'Active', 1, 4),
+(32, 'ST-202513193-2', 'Jean', 'Bosco', '2002-08-20', '2021-06-10', 'Active', 3, 4),
+(33, 'ST-202513193-3', 'Claude', 'Habimana', '2001-11-05', '2020-09-01', 'Active', 2, 5);
+
+-- Comment: Assigns soldiers 31 and 32 to mission M (Mission ID 4: Peace Support) with assigned roles.
+INSERT INTO soldier_missions (soldier_id, mission_id, mission_role) VALUES
+(31, 4, 'Communications Specialist'),
+(32, 4, 'Squad Leader');
+
+
+-- =========================================================================
+-- Part C: Retrieve the data (Using U=4, M=4, P=3)
+-- =========================================================================
+
+-- C1. Last 10 soldiers added, newest first
+-- Does: Retrieves the ten most recently added soldier records sorted by soldier ID in descending order.
+-- Rows returned: 10
+SELECT * FROM soldiers 
+ORDER BY soldier_id DESC 
+LIMIT 10;
+
+-- C2. Same 10 soldiers, displayed from lowest ID to highest ID
+-- Does: Displays the exact same subset of the last 10 added soldiers sorted ascending by ID.
+-- Rows returned: 10
+SELECT * FROM (
+    SELECT * FROM soldiers 
+    ORDER BY soldier_id DESC 
+    LIMIT 10
+) AS recent_soldiers 
+ORDER BY soldier_id ASC;
+
+-- C3. Soldiers whose ID is 10, 15 or 20, using IN
+-- Does: Filters and retrieves soldier records specifically matching IDs 10, 15, or 20 using the IN operator.
+-- Rows returned: 3
+SELECT * FROM soldiers 
+WHERE soldier_id IN (10, 15, 20);
+
+-- C4. Soldiers whose ID is 10+P, 15+P or 20+P, using IN (P=3 -> 13, 18, 23)
+-- Does: Retrieves soldiers whose IDs offset by P (3) match 13, 18, or 23 using the IN operator.
+-- Rows returned: 3
+SELECT * FROM soldiers 
+WHERE soldier_id IN (10 + 3, 15 + 3, 20 + 3);
+
+-- C5. Active soldiers with an ID from 10 to 20, using BETWEEN
+-- Does: Selects soldiers who hold an Active status and have IDs ranging inclusively between 10 and 20.
+-- Rows returned: Variable based on seed data (typically 11 records if all active)
+SELECT * FROM soldiers 
+WHERE status = 'Active' 
+  AND soldier_id BETWEEN 10 AND 20;
+
+-- C6. Each soldier's ID, full name, and rank name ordered by rank level highest first, then last name
+-- Does: Lists soldier details combined with rank titles, sorted primarily by rank level descending and secondarily by last name alphabetically.
+-- Rows returned: Total count of soldiers (e.g., 33)
+SELECT s.soldier_id, 
+       CONCAT(s.first_name, ' ', s.last_name) AS full_name, 
+       r.rank_name, 
+       r.rank_level
+FROM soldiers s
+JOIN ranks r ON s.rank_id = r.rank_id
+ORDER BY r.rank_level DESC, s.last_name ASC;
+
+-- C7. Active soldiers in unit U (Unit ID 4: Delta Company), with name, rank, unit, and location
+-- Does: Retrieves active personnel stationed in Delta Company (Unit U=4), displaying their names, rank, unit name, and base location.
+-- Rows returned: Count of active soldiers in Unit 4
+SELECT s.first_name, s.last_name, r.rank_name, u.unit_name, u.location
+FROM soldiers s
+JOIN ranks r ON s.rank_id = r.rank_id
+JOIN units u ON s.unit_id = u.unit_id
+WHERE s.status = 'Active' 
+  AND s.unit_id = 4;
+
+-- C8. Everyone on mission M (Mission ID 4: Peace Support), with mission name, soldier name, role, and unit name
+-- Does: Displays all personnel participating in mission M (Mission ID 4), along with their roles and respective unit affiliations.
+-- Rows returned: Count of soldiers assigned to Mission 4
+SELECT m.mission_name, 
+       CONCAT(s.first_name, ' ', s.last_name) AS soldier_name, 
+       sm.mission_role, 
+       u.unit_name
+FROM soldier_missions sm
+JOIN missions m ON sm.mission_id = m.mission_id
+JOIN soldiers s ON sm.soldier_id = s.soldier_id
+JOIN units u ON s.unit_id = u.unit_id
+WHERE sm.mission_id = 4;
+
+-- C9. Soldiers who have never been assigned to a mission
+-- Does: Identifies and lists all soldiers who do not have any entries in the soldier_missions junction table.
+-- Rows returned: Count of unassigned soldiers (e.g., soldier 33)
+SELECT s.soldier_id, s.first_name, s.last_name, s.service_number
+FROM soldiers s
+LEFT JOIN soldier_missions sm ON s.soldier_id = sm.soldier_id
+WHERE sm.mission_id IS NULL;
+
+-- C10. Each unit's name and its number of soldiers, largest unit first
+-- Does: Aggregates soldier counts per military unit and sorts the results from the largest unit to the smallest.
+-- Rows returned: 6 (Total units)
+SELECT u.unit_name, COUNT(s.soldier_id) AS soldier_count
+FROM units u
+LEFT JOIN soldiers s ON u.unit_id = s.unit_id
+GROUP BY u.unit_id, u.unit_name
+ORDER BY soldier_count DESC;
+
+
+-- =========================================================================
+-- Part D: Create an index and a view
+-- =========================================================================
+
+-- D1. EXPLAIN and Index Creation
+-- Comment: Run EXPLAIN before index creation to analyze execution cost and table scan type.
+EXPLAIN SELECT * FROM soldiers WHERE last_name = 'Mugisha';
+
+-- Comment: Creates an index on the last_name column to optimize searches.
+CREATE INDEX idx_soldiers_last_name ON soldiers(last_name);
+
+-- Comment: Run EXPLAIN after index creation to confirm type optimization (changes from ALL to ref/range) and key usage.
+EXPLAIN SELECT * FROM soldiers WHERE last_name = 'Mugisha';
+
+
+-- D2. Create View v_soldier_profile
+-- Comment: Creates a view compiling comprehensive soldier identification, rank, unit location, and status details.
+CREATE OR REPLACE VIEW v_soldier_profile AS
+SELECT s.soldier_id, 
+       CONCAT(s.first_name, ' ', s.last_name) AS full_name, 
+       r.rank_name, 
+       u.unit_name, 
+       u.location, 
+       s.status
+FROM soldiers s
+JOIN ranks r ON s.rank_id = r.rank_id
+JOIN units u ON s.unit_id = u.unit_id;
+
+
+-- D3. Use view to show every soldier in unit U (Unit ID 4), ordered by full name
+-- Does: Queries the v_soldier_profile view to filter soldiers belonging to unit U (Unit 4) sorted alphabetically by full name.
+-- Rows returned: Count of soldiers in Unit 4
+SELECT * FROM v_soldier_profile
+WHERE unit_name = (SELECT unit_name FROM units WHERE unit_id = 4)
+ORDER BY full_name ASC;
